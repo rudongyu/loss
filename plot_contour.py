@@ -10,6 +10,7 @@ from matplotlib.colors import LogNorm
 
 
 def plot(config):
+    """plot contour maps according to loss values"""
     config.out_model_dir = os.path.join(config.out_dir, 'params', config.model_config)
     config.out_loss_dir = os.path.join(config.out_dir, 'loss', config.model_config)
     config.out_fig_dir = os.path.join(config.out_dir, 'fig', config.model_config)
@@ -24,9 +25,6 @@ def plot(config):
     plt.contourf(X, Y, Z, levels, alpha=.75, cmap=plt.cm.hot)
     C = plt.contour(X, Y, Z, levels, colors='black', linewidth=.5)
     plt.clabel(C, inline=True, fontsize=10)
-    # plt.xticks(())
-    # plt.yticks(())
-    # plt.set_title('loss on test set')
     plt.savefig(os.path.join(config.out_fig_dir, 'cont.png'))
     plt.clf()
     plt.imshow(Z, norm=LogNorm(), cmap='hot')
@@ -35,6 +33,7 @@ def plot(config):
 
 
 if __name__ == '__main__':
+    # process input parameters
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--data_dir', default='../cifar10')
     argparser.add_argument('--train_ratio', type=float, default=-1)

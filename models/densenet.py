@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 
 class Bottleneck(nn.Module):
+    """build bottleneck block with two conv layers"""
     def __init__(self, in_planes, growth_rate):
         super(Bottleneck, self).__init__()
         self.bn1 = nn.BatchNorm2d(in_planes)
@@ -21,6 +22,7 @@ class Bottleneck(nn.Module):
 
 
 class Transition(nn.Module):
+    """build transitions between dense layers"""
     def __init__(self, in_planes, out_planes):
         super(Transition, self).__init__()
         self.bn = nn.BatchNorm2d(in_planes)
@@ -32,6 +34,7 @@ class Transition(nn.Module):
         return out
 
 
+#  densenet commonly used config
 cfg = {
     'DenseNet121': [Bottleneck, [6, 12, 24, 16], 32],
     'DenseNet161': [Bottleneck, [6, 12, 32, 32], 32],
@@ -40,7 +43,7 @@ cfg = {
 
 
 class DenseNet(nn.Module):
-    # def __init__(self, block, nblocks, growth_rate=12, reduction=0.5, num_classes=15):
+    """define the structure of densenet"""
     def __init__(self, cfg_name, reduction=0.5, num_classes=10):
         super(DenseNet, self).__init__()
         block, nblocks, growth_rate = cfg[cfg_name]
@@ -75,6 +78,7 @@ class DenseNet(nn.Module):
         self.loss_fct = nn.CrossEntropyLoss()
 
     def _make_dense_layers(self, block, in_planes, nblock):
+        """define model structure"""
         layers = []
         for i in range(nblock):
             layers.append(block(in_planes, self.growth_rate))
@@ -82,6 +86,7 @@ class DenseNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, label=None):
+        """define foward pass execution"""
         out = self.conv1(x)
         out = self.trans1(self.dense1(out))
         out = self.trans2(self.dense2(out))
@@ -94,38 +99,3 @@ class DenseNet(nn.Module):
         if label is None:
             return out
         return self.loss_fct(out, label)
-
-
-def DenseNet121():
-    return DenseNet(Bottleneck, [6,12,24,16], growth_rate=32)
-
-
-def DenseNet169():
-    return DenseNet(Bottleneck, [6,12,32,32], growth_rate=32)
-
-
-def DenseNet201():
-    return DenseNet(Bottleneck, [6,12,48,32], growth_rate=32)
-
-
-def DenseNet161():
-    return DenseNet(Bottleneck, [6,12,36,24], growth_rate=48)
-
-
-def densenet_cifar():
-    return DenseNet(Bottleneck, [6,12,24,16], growth_rate=12)
-
-
-def DenseNetTiny():
-    return DenseNet(Bottleneck, [6, 12, 24, 16], growth_rate=12)
-
-
-def test():
-    net = densenet_cifar()
-    x = torch.randn(4, 3, 32, 32)
-    y = net(x, None)
-    print(y.size())
-
-
-if __name__ == '__main__':
-    test()

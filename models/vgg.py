@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 
 
+#  commonly used VGG structures
 cfg = {
     'VGG9':  [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M'],
     'VGG11': [64, 'M', 128, 'M', 256, 256, 'M', 512, 512, 'M', 512, 512, 'M'],
@@ -12,6 +13,7 @@ cfg = {
 
 
 class VGG(nn.Module):
+    """define the VGG model structures"""
     def __init__(self, vgg_name):
         super(VGG, self).__init__()
         self.features = self._make_layers(cfg[vgg_name])
@@ -40,14 +42,3 @@ class VGG(nn.Module):
                 in_channels = x
         layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
         return nn.Sequential(*layers)
-
-
-def test():
-    net = VGG('VGG11')
-    x = torch.randn(4, 3, 32, 32)
-    y = net(x)
-    print(y.size())
-
-
-if __name__ == '__main__':
-    test()

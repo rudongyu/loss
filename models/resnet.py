@@ -4,6 +4,7 @@ import torch.nn.functional as F
 
 
 class BasicBlock(nn.Module):
+    """build basic block in resnet with two conv layers"""
     expansion = 1
 
     def __init__(self, in_planes, planes, stride=1):
@@ -29,6 +30,7 @@ class BasicBlock(nn.Module):
 
 
 class BasicBlockNoSkip(nn.Module):
+    """build basic blocks without skip connections"""
     expansion = 1
 
     def __init__(self, in_planes, planes, stride=1):
@@ -45,6 +47,7 @@ class BasicBlockNoSkip(nn.Module):
 
 
 class Bottleneck(nn.Module):
+    """build bottleneck block used in resnet with 3 conv layers"""
     expansion = 4
 
     def __init__(self, in_planes, planes, stride=1):
@@ -73,6 +76,7 @@ class Bottleneck(nn.Module):
 
 
 class BottleneckNoSkip(nn.Module):
+    """build bottleneck blocks without skip connections"""
     expansion = 4
 
     def __init__(self, in_planes, planes, stride=1):
@@ -91,6 +95,7 @@ class BottleneckNoSkip(nn.Module):
         return out
 
 
+#  commonly used resnet config
 cfg = {
     'ResNet18': [BasicBlock, [2, 2, 2, 2]],
     'ResNet18NoSkip': [BasicBlockNoSkip, [2, 2, 2, 2]],
@@ -104,7 +109,7 @@ cfg = {
 
 
 class ResNet(nn.Module):
-    # def __init__(self, block, num_blocks, num_classes=15):
+    """define the structure of resnet"""
     def __init__(self, resnet_name, num_classes=10):
         super(ResNet, self).__init__()
         block, num_blocks = cfg[resnet_name]
@@ -119,6 +124,7 @@ class ResNet(nn.Module):
         self.loss_fct = nn.CrossEntropyLoss()
 
     def _make_layer(self, block, planes, num_blocks, stride):
+        """define model structures according to input config"""
         strides = [stride] + [1]*(num_blocks-1)
         layers = []
         for stride in strides:
@@ -127,6 +133,7 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, label=None):
+        """define the forward pass execution"""
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.layer1(out)
         out = self.layer2(out)
@@ -138,33 +145,3 @@ class ResNet(nn.Module):
         if label is None:
             return out
         return self.loss_fct(out, label)
-
-
-def ResNet18():
-    return ResNet(BasicBlock, [2, 2, 2, 2])
-
-
-def ResNet34():
-    return ResNet(BasicBlock, [3, 4, 6, 3])
-
-
-def ResNet50():
-    return ResNet(Bottleneck, [3, 4, 6, 3])
-
-
-def ResNet101():
-    return ResNet(Bottleneck, [3, 4, 23, 3])
-
-
-def ResNet152():
-    return ResNet(Bottleneck, [3, 8, 36, 3])
-
-
-def test():
-    net = ResNet18()
-    y = net(torch.randn(4, 3, 32, 32), None)
-    print(y.size())
-
-
-if __name__ == '__main__':
-    test()

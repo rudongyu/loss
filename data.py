@@ -16,12 +16,14 @@ import numpy as np
 
 
 def unpickle(file):
+    """load raw data from pickle file"""
     with open(file, 'rb') as fo:
         data = pickle.load(fo, encoding='bytes')
     return data
 
 
 def prepro_data_args():
+    """process config parameters"""
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--data_dir', default='../cifar10')
     argparser.add_argument('--train_ratio', type=float, default=-1)
@@ -30,6 +32,7 @@ def prepro_data_args():
 
 
 def load_test_data(config):
+    """load test data from given directory"""
     test_file_path = os.path.join(config.data_dir, 'cifar-10-batches-py', 'test_batch')
     dataset = unpickle(test_file_path)
     data, labels = dataset[b'data'], dataset[b'labels']
@@ -38,6 +41,7 @@ def load_test_data(config):
 
 
 def load_train_data(config):
+    """load training data with a given ratio"""
     data, labels = [], []
     for fi in range(5):
         train_file_path = os.path.join(config.data_dir, 'cifar-10-batches-py', 'data_batch_{}'.format(fi+1))
@@ -54,6 +58,7 @@ def load_train_data(config):
 
 
 class CifarDataset(Dataset):
+    """process cifar data instances with image reading and normalization"""
     def __init__(self, data, labels):
         self.data = data
         self.labels = labels

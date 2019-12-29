@@ -4,8 +4,10 @@ import torchvision.transforms as transforms
 
 
 def get_data_loaders(args):
+    """get dataloaders of training set and test set of cifar10 from torchvision apis"""
     normalize = transforms.Normalize((.4914, .4822, .4465), (.2470, .2435, .2616))
 
+    #  randomly crop or flip for data augmentation
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),

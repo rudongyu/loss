@@ -18,6 +18,8 @@ import os
 import random
 import argparse
 
+
+#  load models according to name
 models = {
     'vgg': VGG,
     'resnet': ResNet,
@@ -26,6 +28,7 @@ models = {
 
 
 def init_params(net):
+    """initialize the parameters of CNNs"""
     for m in net.modules():
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
             init.kaiming_normal_(m.weight, mode='fan_in')
@@ -41,48 +44,38 @@ def init_params(net):
 
 
 def loss_surface_2d(config, model, data_loader):
+    """calculate loss values in 2-d hyperplane"""
     delta, eta = OrderedDict(), OrderedDict()
     for k, v in model.state_dict().items():
-        # if any([name in k for name in ['running_var', 'running_mean', 'num_batches_tracked']]) or v.dim() < 2:
+        # batch normalization or bias parameters are omitted
         if v.dim() <= 1:
-            # delta[k] = eta[k] = v
             delta[k], eta[k] = torch.zeros_like(v), torch.zeros_like(v)
+        # perform filter wise normalization
         else:
-            # TODO filter wise norm
             delta[k] = torch.randn_like(v)
             eta[k] = torch.randn_like(v)
             for d1, d2, w in zip(delta[k], eta[k], v):
                 d1.mul_(w.norm() / (d1.norm() + 1e-10))
                 d2.mul_(w.norm() / (d2.norm() + 1e-10))
-            # delta[k] *= torch.norm(v)/torch.norm(delta[k])
-            # eta[k] *= torch.norm(v)/torch.norm(eta[k])
+    # define axes of contour maps
     alphas = betas = np.linspace(config.xmin, config.xmax, num=config.size, endpoint=False)
     Alpha, Beta = np.meshgrid(alphas, betas)
     loss_values = np.zeros([config.size, config.size])
     perturbed_model = deepcopy(model)
+    # calculate the loss value in each grid point
     for i, (alpha, beta) in tqdm(enumerate(zip(Alpha.reshape(-1), Beta.reshape(-1))), ncols=50, total=config.size**2):
-            perturbed_state_dict = get_shifted_state_dict(model, alpha, beta, delta, eta)
-            loss = get_single_point_loss(perturbed_model, data_loader, perturbed_state_dict)
-            loss_values[i // config.size, i % config.size] = loss
+        perturbed_state_dict = get_shifted_state_dict(model, alpha, beta, delta, eta)
+        loss = get_single_point_loss(perturbed_model, data_loader, perturbed_state_dict)
+        loss_values[i // config.size, i % config.size] = loss
     torch.save(loss_values, os.path.join(config.out_loss_dir, 'loss*{}*{}*{}'.format(config.xmin, config.xmax, config.size)))
-
-    # fig = plt.figure()
-    # ax = fig.gca(projection='3d')
-    # surf = ax.plot_surface(alphas, betas, loss_values, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-    # plt.savefig('vgg11.png')
 
 
 @torch.no_grad()
 def get_single_point_loss(shifted_model, data_loader, perturbed_state_dict):
+    """calculate the loss value in a single grid point"""
     shifted_model.load_state_dict(perturbed_state_dict)
     shifted_model.eval()
     total = total_loss = 0
-    # for data in data_loader:
-    #     images, labels = data
-    #     outputs = shifted_model(images.to(0))
-    #     _, predicted = torch.max(outputs.data, 1)
-    #     total += labels.size(0)
-    #     correct += (predicted == labels.to(0)).sum().item()
     for inputs, labels in data_loader:
         loss = shifted_model(inputs.to(0), labels.to(0))
         total_loss += loss.item() * len(inputs)
@@ -91,11 +84,11 @@ def get_single_point_loss(shifted_model, data_loader, perturbed_state_dict):
 
 
 def get_shifted_state_dict(model, alpha, beta, delta, eta):
+    """calculate the shifted parameters in state_dicts"""
     theta = deepcopy(model.state_dict())
     for name in delta:
-        # if any([n in name for n in ['running_var', 'running_mean', 'num_batches_tracked']]):
+        # ignore batch normalization or bias parameters
         if delta[name].dim() <= 1:
-            # theta[name].fill_(0)
             continue
         theta[name] += alpha * delta[name] + beta * eta[name]
 
@@ -103,12 +96,14 @@ def get_shifted_state_dict(model, alpha, beta, delta, eta):
 
 
 def main(config):
+    # initialize random seeds
     random.seed(config.rand_seed)
     np.random.seed(config.rand_seed)
     torch.manual_seed(config.rand_seed)
     torch.cuda.manual_seed_all(config.rand_seed)
     cudnn.benchmark = True
 
+    # initialize output directories
     config.out_model_dir = os.path.join(config.out_dir, 'params', config.model_config)
     config.out_loss_dir = os.path.join(config.out_dir, 'loss', config.model_config)
     config.out_fig_dir = os.path.join(config.out_dir, 'fig', config.model_config)
@@ -116,17 +111,14 @@ def main(config):
         if not os.path.exists(d):
             os.makedirs(d)
 
+    # initialize the model
     model = models[config.model](config.model_config).to(0)
     init_params(model)
-    # train_data = CifarDataset(*load_train_data(config))
-    # test_data = CifarDataset(*load_test_data(config))
-    # train_loader = torch.utils.data.DataLoader(train_data, batch_size=args.batch_size, shuffle=True, num_workers=0)
-    # test_loader = torch.utils.data.DataLoader(test_data, batch_size=1000, shuffle=False, num_workers=0)
     train_loader, test_loader = get_data_loaders(config)
 
+    # train the model from scratch
     if config.train:
         if config.optimizer == 'SGD':
-            # optimizer = optim.SGD(model.parameters(), lr=config.lr, momentum=0.9)
             optimizer = optim.SGD(model.parameters(), lr=config.lr, momentum=0.9, weight_decay=config.weight_decay,
                                   nesterov=True)
         else:
@@ -155,16 +147,22 @@ def main(config):
                 total += labels.size(0)
                 correct += (predicted == labels.to(0)).sum().item()
 
+        # record the model parameters and test acc
         print('Accuracy of the network on the 10000 test images: {}'.format(correct / total * 100))
         state = {'state_dict': model.state_dict(), 'acc': correct/total}
         torch.save(state, os.path.join(config.out_model_dir, 'model_state'))
+
+    # if trained already, load parameters from given directory
     else:
         model.load_state_dict(torch.load(os.path.join(config.out_model_dir, 'model_state'))['state_dict'])
         model.eval()
+
+    # calculate loss values
     loss_surface_2d(config, model, test_loader)
 
 
 if __name__ == '__main__':
+    # set config parameters
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--data_dir', default='../cifar10')
     argparser.add_argument('--train_ratio', type=float, default=-1)
